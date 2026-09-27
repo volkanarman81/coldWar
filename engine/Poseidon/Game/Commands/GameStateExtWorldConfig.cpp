@@ -40,6 +40,8 @@
 #include <time.h>
 #include <string.h>
 #include <cmath>
+#include <filesystem>
+#include <string>
 #include <Poseidon/Foundation/Common/FltOpts.hpp>
 #include <Poseidon/Foundation/Containers/Array.hpp>
 #include <Poseidon/Foundation/Enums/EnumNames.hpp>
@@ -67,6 +69,7 @@ namespace Poseidon
 #endif
 
 #include <Poseidon/IO/Streams/QBStream.hpp>
+#include <Poseidon/IO/Filesystem/Utf8Paths.hpp>
 #include <Poseidon/IO/PreprocC/Preproc.h>
 
 #include <Poseidon/Foundation/Platform/VersionNo.h>
@@ -79,6 +82,7 @@ void CreatePath(RString);
 void AddDeadIdentity(RString);
 RString FindScript(RString name);
 RString GetUserDirectory();
+int GetDaysInMonth(int year, int month);
 } // namespace Poseidon
 
 static RString ConfigFullName(RString filename)
@@ -98,6 +102,57 @@ static RString ConfigFullName(RString filename)
         return RString();
     }
     return Poseidon::GetUserDirectory() + RString("Config/") + filename;
+}
+
+// saveString / loadString storage: <user dir>/Saves/<name>
+static const int SavedStringMaxNameLength = 64;
+static const int SavedStringMaxSize = 1024 * 1024;
+
+static bool IsReservedDeviceName(const char* filename)
+{
+    // Windows opens a device instead of a file for these, whatever the extension
+    static const char* reserved[] = {"con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4",
+                                     "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3",
+                                     "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"};
+    const char* ext = strchr(filename, '.');
+    int baseLen = ext ? int(ext - filename) : int(strlen(filename));
+    for (const char* name : reserved)
+    {
+        if (int(strlen(name)) == baseLen && strnicmp(filename, name, baseLen) == 0)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Map a script-supplied name to a file in the Saves folder. Only plain file names
+// made of [A-Za-z0-9_.-] are accepted, so scripts cannot reach any other path.
+static RString SavedStringFullName(RString filename)
+{
+    int len = filename.GetLength();
+    if (len == 0 || len > SavedStringMaxNameLength)
+    {
+        return RString();
+    }
+    // no hidden files, no "." / ".."
+    if (filename[0] == '.')
+    {
+        return RString();
+    }
+    for (int i = 0; i < len; i++)
+    {
+        unsigned char c = static_cast<unsigned char>(filename[i]);
+        if (!isalnum(c) && c != '_' && c != '-' && c != '.')
+        {
+            return RString();
+        }
+    }
+    if (IsReservedDeviceName(filename))
+    {
+        return RString();
+    }
+    return Poseidon::GetUserDirectory() + RString("Saves/") + filename;
 }
 
 static GameFileType GetFile(GameValuePar oper)
@@ -637,6 +692,59 @@ GameValue SetDate(const GameState* state, GameValuePar oper1)
     return NOTHING;
 }
 
+// date: [year, month, day, hour, minute], the same layout setDate takes
+GameValue GetDate(const GameState* state)
+{
+    int year = Glob.clock.GetYear();
+    int day = int(floor(Glob.clock.GetTimeInYear() * 365));
+    if (day < 0)
+    {
+        day = 0;
+    }
+    int month = 0;
+    while (month < 11 && day >= Poseidon::GetDaysInMonth(year, month))
+    {
+        day -= Poseidon::GetDaysInMonth(year, month);
+        month++;
+    }
+    int minutes = int(floor(Glob.clock.GetTimeOfDay() * 24 * 60));
+    if (minutes < 0)
+    {
+        minutes = 0;
+    }
+    else if (minutes > 24 * 60 - 1)
+    {
+        minutes = 24 * 60 - 1;
+    }
+
+    GameValue value = state->CreateGameValue(GameArray);
+    GameArrayType& array = value;
+    array.Resize(5);
+    array[0] = float(year);
+    array[1] = float(month + 1);
+    array[2] = float(day + 1);
+    array[3] = float(minutes / 60);
+    array[4] = float(minutes % 60);
+    return value;
+}
+
+// overcast / fog: current values, 0..1 (what setOvercast / setFog move towards)
+GameValue GetOvercast(const GameState* state)
+{
+    return GWorld->GetActualOvercast();
+}
+
+GameValue GetFog(const GameState* state)
+{
+    return GWorld->GetActualFog();
+}
+
+// rain: current rain density, 0..1
+GameValue GetRain(const GameState* state)
+{
+    return GLandscape->GetRainDensity();
+}
+
 GameValue CenterCreate(const GameState* state, GameValuePar oper1)
 {
     GameSideType side = GetSide(oper1);
@@ -1055,6 +1163,77 @@ GameValue StringLoad(const GameState* state, GameValuePar oper1)
         return RString(in.act(), in.rest());
     }
     return RString();
+}
+
+// In multiplayer only the server (dedicated or the hosting player) keeps saves, so a
+// client never writes to its own disk on behalf of a mission. Single player is allowed.
+static bool SavedStringsAllowed()
+{
+    const INetworkManager& network = GetNetworkManager();
+    return network.IsServer() || network.GetGameState() == NGSNone;
+}
+
+// "name" saveString "text": write text to <user dir>/Saves/name, replacing any old content.
+// Returns false on a multiplayer client, an invalid name, oversized text or a write error.
+GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar oper2)
+{
+    if (!SavedStringsAllowed())
+    {
+        return false;
+    }
+    RString fullname = SavedStringFullName(oper1);
+    if (fullname.GetLength() == 0)
+    {
+        return false;
+    }
+    RString text = oper2;
+    int size = text.GetLength();
+    if (size > SavedStringMaxSize)
+    {
+        return false;
+    }
+
+    // Write a temp file and move it over the old save, so a crash or a full disk never
+    // leaves a half-written save. Scripts cannot name the temp file ('~' is not allowed).
+    std::string target = (const char*)fullname;
+    std::string temp = target + ".~tmp";
+    const char* data = text;
+    std::error_code ec;
+    if (!Poseidon::WriteFileUtf8(temp.c_str(), data ? data : "", size_t(size)))
+    {
+        std::filesystem::remove(Poseidon::FilesystemPathFromUtf8(temp), ec);
+        return false;
+    }
+    std::filesystem::rename(Poseidon::FilesystemPathFromUtf8(temp), Poseidon::FilesystemPathFromUtf8(target), ec);
+    if (ec)
+    {
+        std::error_code ignored;
+        std::filesystem::remove(Poseidon::FilesystemPathFromUtf8(temp), ignored);
+        return false;
+    }
+    return true;
+}
+
+// loadString "name": content of <user dir>/Saves/name, or "" if it does not exist
+// (always "" on a multiplayer client).
+GameValue StringLoadSaved(const GameState* state, GameValuePar oper1)
+{
+    if (!SavedStringsAllowed())
+    {
+        return RString();
+    }
+    RString fullname = SavedStringFullName(oper1);
+    if (fullname.GetLength() == 0 || !QIFStream::FileExists(fullname))
+    {
+        return RString();
+    }
+    QIFStream in;
+    in.open(fullname);
+    if (in.fail() || in.rest() > SavedStringMaxSize)
+    {
+        return RString();
+    }
+    return RString(in.act(), in.rest());
 }
 
 class FilePreprocessor : public Preproc

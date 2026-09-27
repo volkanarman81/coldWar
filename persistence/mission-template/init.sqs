@@ -1,0 +1,5 @@
+; Add this line to your mission's init.sqs.
+[] exec "persistence\init.sqs"
+
+; Set defaults for kept variables only when the save did not provide them, e.g.:
+; ?isNil "money" : money = 0

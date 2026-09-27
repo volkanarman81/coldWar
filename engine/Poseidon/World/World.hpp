@@ -680,6 +680,8 @@ class World
 	void ScanPlayers(StaticArrayAuto< OLink<Person> > &players); // used in multiplayers
 
 	void SetWeather(float overcast, float fog, float time);
+	float GetActualOvercast() const {return _actualOvercast;}
+	float GetActualFog() const {return _actualFog;}
 	void SetDate(int year, int month, int day, int hour, int minute);
 	float GetLatitude() const {return _latitude;}
 	float GetLongitude() const {return _longitude;}

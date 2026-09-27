@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <cmath>
+#include <string>
 #include <Poseidon/Foundation/Common/FltOpts.hpp>
 #include <Poseidon/Foundation/Framework/AppFrame.hpp>
 #include <Poseidon/Foundation/Framework/DebugLog.hpp>
@@ -1016,6 +1017,107 @@ static GameValue ParseSimpleArray(const GameState* state, GameValuePar oper1)
     return state->Evaluate(expression);
 }
 
+// str value — text that reads back as the same value through call / parseSimpleArray:
+// numbers keep full float precision, quotes inside strings are doubled, arrays nest.
+// Values with no literal form (objects, groups, ...) fall back to their display text.
+static void AppendValueText(std::string& out, GameValuePar value, int depth)
+{
+    if (value.GetNil())
+    {
+        out += "nil";
+        return;
+    }
+    GameType type = value.GetType();
+    if (type == GameScalar)
+    {
+        float number = value;
+        if (std::isnan(number))
+        {
+            out += "0";
+            return;
+        }
+        if (std::isinf(number))
+        {
+            out += number > 0 ? "1e+38" : "-1e+38";
+            return;
+        }
+        // shortest representation that parses back to the same float
+        char buf[32];
+        for (int precision = 6; precision <= 9; precision++)
+        {
+            snprintf(buf, sizeof(buf), "%.*g", precision, number);
+            if (strtof(buf, nullptr) == number)
+            {
+                break;
+            }
+        }
+        out += buf;
+    }
+    else if (type == GameBool)
+    {
+        out += (bool)value ? "true" : "false";
+    }
+    else if (type == GameString)
+    {
+        RString text = value;
+        out += '"';
+        for (const char* c = text; c && *c; c++)
+        {
+            if (*c == '"')
+            {
+                out += '"';
+            }
+            out += *c;
+        }
+        out += '"';
+    }
+    else if (type == GameArray)
+    {
+        const GameArrayType& array = value;
+        out += '[';
+        if (depth < 64)
+        {
+            for (int i = 0; i < array.Size(); i++)
+            {
+                if (i > 0)
+                {
+                    out += ',';
+                }
+                AppendValueText(out, array[i], depth + 1);
+            }
+        }
+        out += ']';
+    }
+    else
+    {
+        RString text = value.GetText();
+        out += (const char*)text ? (const char*)text : "";
+    }
+}
+
+static GameValue ValueToString(const GameState* state, GameValuePar oper1)
+{
+    std::string text;
+    AppendValueText(text, oper1, 0);
+    return RString(text.c_str());
+}
+
+// isNil "name" — true when the variable is undefined or nil.
+// isNil "code" / isNil {code} — true when the code evaluates to nil.
+static GameValue IsNilString(const GameState* state, GameValuePar oper1)
+{
+    RString text = oper1;
+    if (text.GetLength() == 0)
+    {
+        return true;
+    }
+    if (state->IdtfGoodName(text))
+    {
+        return state->VarGet(text).GetNil();
+    }
+    return state->Evaluate(text).GetNil();
+}
+
 static GameValue ListCountCond(const GameState* state, GameValuePar oper1, GameValuePar oper2)
 {
     GameVarSpace local(state->GetContext());
@@ -1189,6 +1291,8 @@ static const GameFunction* GetDefaultUnary(int* outSize = nullptr)
         GameFunction(GameNothing, "comment", StringIgnore, GameString),
         GameFunction(GameNothing, "private", StringLocal, GameString | GameArray),
         GameFunction(GameAny, "parseSimpleArray", ParseSimpleArray, GameString),
+        GameFunction(GameString, "str", ValueToString, GameAny),
+        GameFunction(GameBool, "isNil", IsNilString, GameString),
 
         GameFunction(GameIf, "if", IfBool, GameBool),
         GameFunction(GameWhile, "while", WhileString, GameString),

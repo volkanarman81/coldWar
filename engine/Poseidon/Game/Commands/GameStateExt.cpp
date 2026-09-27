@@ -395,6 +395,10 @@ GameValue CameraOn(const GameState* state);
 GameValue ConfigListNames(const GameState* state);
 GameValue ConfigNew(const GameState* state);
 GameValue DayTime(const GameState* state);
+GameValue GetDate(const GameState* state);
+GameValue GetFog(const GameState* state);
+GameValue GetOvercast(const GameState* state);
+GameValue GetRain(const GameState* state);
 GameValue EnableEndDialog(const GameState* state);
 GameValue EndGame(const GameState* state);
 GameValue ForceEnd(const GameState* state);
@@ -626,6 +630,7 @@ GameValue StrLocalize(const GameState* state, GameValuePar oper1);
 GameValue StrSize(const GameState* state, GameValuePar oper1);
 GameValue StrSub(const GameState* state, GameValuePar oper1);
 GameValue StringLoad(const GameState* state, GameValuePar oper1);
+GameValue StringLoadSaved(const GameState* state, GameValuePar oper1);
 GameValue StringPreprocess(const GameState* state, GameValuePar oper1);
 GameValue LogInfo(const GameState* state, GameValuePar oper1);
 GameValue TextDebugLog(const GameState* state, GameValuePar oper1);
@@ -662,6 +667,7 @@ GameValue CenterSetFriend(const GameState* state, GameValuePar oper1, GameValueP
 GameValue ClassAdd(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue ClassOpen(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue ConfigSave(const GameState* state, GameValuePar oper1, GameValuePar oper2);
+GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue EffectSetCamera(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue EffectSetCondition(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue EffectSetMusic(const GameState* state, GameValuePar oper1, GameValuePar oper2);
@@ -858,6 +864,10 @@ static const GameNular* GetExtNular(int& count)
         GameNular(GameGroup, "grpNull", GrpNull),
         GameNular(GameScalar, "time", GameTime),
         GameNular(GameScalar, "dayTime", DayTime),
+        GameNular(GameArray, "date", GetDate),
+        GameNular(GameScalar, "overcast", GetOvercast),
+        GameNular(GameScalar, "fog", GetFog),
+        GameNular(GameScalar, "rain", GetRain),
         GameNular(GameBool, "cadetMode", CadetMode),
         GameNular(GameScalar, "benchmark", Benchmark),
         GameNular(GameScalar, "accTime", GetAcceleratedTime),
@@ -1157,6 +1167,7 @@ static const GameFunction* GetExtUnary(int& count)
         GameFunction(GameArray, "VBS_injuries", GetMPReportInjuries, GameString),
 
         GameFunction(GameString, "loadFile", StringLoad, GameString),
+        GameFunction(GameString, "loadString", StringLoadSaved, GameString),
         GameFunction(GameString, "preprocessFile", StringPreprocess, GameString),
 
         GameFunction(GameScalar, "playersNumber", PlayersNumber, GameSide),
@@ -1385,6 +1396,7 @@ static const GameOperator* GetExtBinary(int& count)
         GameOperator(GameNothing, "setObjectTexture", function, ObjSetTexture, GameObject, GameArray),
 
         GameOperator(GameNothing, "saveConfig", function, ConfigSave, GameFile, GameString),
+        GameOperator(GameBool, "saveString", function, StringSave, GameString, GameString),
         GameOperator(GameFile, "openClass", function, ClassOpen, GameFile, GameString),
         GameOperator(GameFile, "addClass", function, ClassAdd, GameFile, GameString),
         GameOperator(GameVoid, "getValue", function, ValueGet, GameFile, GameString),

@@ -1,0 +1,11 @@
+; Persistence entry point. Run it from the mission's init.sqs and initJIP.sqs:
+;   [] exec "persistence\init.sqs"
+?!(isNil "PERS_initStarted") : exit
+PERS_initStarted = true
+
+call preprocessFile "persistence\config.sqf"
+call preprocessFile "persistence\functions.sqf"
+
+?isServer : [] exec "persistence\server.sqs"
+?!(isNull player) : [] exec "persistence\client.sqs"
+exit

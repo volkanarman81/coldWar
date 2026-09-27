@@ -58,6 +58,7 @@ set(POSEIDON_CORE_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/tests/unit/engine/Evaluator/test_evaluator_nulars.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/engine/Evaluator/test_evaluator_operators.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/engine/Evaluator/test_evaluator_reentrancy.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/engine/Evaluator/test_evaluator_str_isnil.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/engine/Evaluator/test_evaluator_script_integration.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/engine/Evaluator/test_evaluator_simple.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/engine/Evaluator/test_evaluator_state_vars.cpp
