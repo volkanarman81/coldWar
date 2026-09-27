@@ -33,6 +33,8 @@ Rules:
   rejected. Any path separator, drive letter or other character is rejected.
 - Text is limited to 1 MiB per file, and a file larger than that loads as `""`.
 - Every mission uses the same `Saves/` folder, so pick distinctive names.
+- A save is written to a temporary file first and then moved over the old one, so a
+  crash or a full disk never leaves a half-written save.
 - In multiplayer only the server keeps saves: the dedicated server or the player
   hosting the game. On a client connected to someone else's game, `saveString`
   returns `false` and `loadString` returns `""`. Single player is not affected.
@@ -67,3 +69,29 @@ Changed files:
 - `engine/Poseidon/Game/Commands/GameStateExt.cpp`: command registration
 - `engine/Poseidon/World/World.hpp`: `GetActualOvercast()` / `GetActualFog()` accessors
 - `tests/unit/engine/Poseidon/Game/test_game_state_ext.cpp`: registration checks
+
+## 2026-09-27: `str` and `isNil`
+
+Needed to write saves that read back exactly.
+
+| Command | Returns |
+|---------|---------|
+| `str value` | text that `call` / `parseSimpleArray` read back as the same value |
+| `isNil "name"` | `true` if the variable is undefined or nil (commands are not variables) |
+| `isNil {code}` | `true` if the code evaluates to nil |
+
+`str` differs from `format ["%1", value]` in three ways:
+
+- Numbers keep full float precision: `str 1234567` is `1234567`, not `1.23457e+06`.
+- Quotes inside strings are doubled, so strings containing `"` survive.
+- A nil element of an array is written as `nil`.
+
+Objects, groups and other values with no literal form fall back to their display text
+and do not read back. `str nil` is itself nil, like any command given a nil argument.
+
+Changed files:
+
+- `engine/Evaluator/express.cpp`: `str` and `isNil`
+- `engine/Evaluator/EvalState.cpp`: removed the standalone validator's own `str` stub,
+  which the new command replaces
+- `tests/unit/engine/Evaluator/test_evaluator_str_isnil.cpp`: unit tests

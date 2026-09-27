@@ -160,11 +160,6 @@ static GameValue StubDiagLog(const GameState* state, GameValuePar arg)
     return NOTHING;
 }
 
-static GameValue EvalToString(const GameState*, GameValuePar arg)
-{
-    return GameValue(arg.GetText());
-}
-
 static GameValue EvalToArray(const GameState*, GameValuePar arg)
 {
     RString str = arg;
@@ -195,7 +190,6 @@ void EvalState::RegisterEvalCommands()
 
     NewFunction(GameFunction(GameString, "format", EvalFormat, GameArray));
 
-    NewFunction(GameFunction(GameString, "str", EvalToString, GameVoid));
     NewFunction(GameFunction(GameArray, "toArray", EvalToArray, GameString));
     NewFunction(GameFunction(GameString, "toString", EvalToStringFromArray, GameArray));
 

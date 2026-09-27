@@ -40,6 +40,8 @@
 #include <time.h>
 #include <string.h>
 #include <cmath>
+#include <filesystem>
+#include <string>
 #include <Poseidon/Foundation/Common/FltOpts.hpp>
 #include <Poseidon/Foundation/Containers/Array.hpp>
 #include <Poseidon/Foundation/Enums/EnumNames.hpp>
@@ -67,6 +69,7 @@ namespace Poseidon
 #endif
 
 #include <Poseidon/IO/Streams/QBStream.hpp>
+#include <Poseidon/IO/Filesystem/Utf8Paths.hpp>
 #include <Poseidon/IO/PreprocC/Preproc.h>
 
 #include <Poseidon/Foundation/Platform/VersionNo.h>
@@ -1190,15 +1193,25 @@ GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar op
         return false;
     }
 
-    CreatePath(fullname);
-    QOFStream out;
-    out.open(fullname);
-    if (size > 0)
+    // Write a temp file and move it over the old save, so a crash or a full disk never
+    // leaves a half-written save. Scripts cannot name the temp file ('~' is not allowed).
+    std::string target = (const char*)fullname;
+    std::string temp = target + ".~tmp";
+    const char* data = text;
+    std::error_code ec;
+    if (!Poseidon::WriteFileUtf8(temp.c_str(), data ? data : "", size_t(size)))
     {
-        out.write(text, size);
+        std::filesystem::remove(Poseidon::FilesystemPathFromUtf8(temp), ec);
+        return false;
     }
-    out.close();
-    return !out.fail();
+    std::filesystem::rename(Poseidon::FilesystemPathFromUtf8(temp), Poseidon::FilesystemPathFromUtf8(target), ec);
+    if (ec)
+    {
+        std::error_code ignored;
+        std::filesystem::remove(Poseidon::FilesystemPathFromUtf8(temp), ignored);
+        return false;
+    }
+    return true;
 }
 
 // loadString "name": content of <user dir>/Saves/name, or "" if it does not exist
