@@ -125,4 +125,87 @@ persistence/tests/run.sh
 
 Bu testler gerçek bir LAN oturumunun yerini tutmaz. Ağ davranışı (`remoteExec`,
 `publicVariable`) koddan incelenerek tasarlandı ama gerçek bir oyunda denenmedi.
-İlk oturumda host'un log'unda `Persistence: host ready` satırını görmelisiniz.
+Gerçek oyunda nasıl deneneceği için aşağıdaki bölüme bakın.
+
+## Gerçek oyunda deneme
+
+### 1. Derleme
+
+**Windows:**
+- **Gerekenler:** LLVM/Clang, Visual Studio Build Tools (Windows SDK için), CMake,
+  Ninja ve vcpkg. vcpkg'yi kurup `VCPKG_ROOT` ortam değişkenini onun klasörüne
+  ayarlayın.
+- **Derleme komutları** (deponun kök klasöründe):
+  ```
+  cmake --preset win-x64-clang-rwdi
+  cmake --build build/win-x64-clang-rwdi
+  ```
+- **Çıktı:** Oyun `dist\x64-win-rwdi\PoseidonGame.exe` gibi bir klasöre kopyalanır.
+
+**Linux:** Aynı adımlar, preset adı `linux-x64-clang-rwdi`.
+
+Preset'ler derlemeyi `ccache` ile çalıştırır. Kurulu değilse ya kurun ya da ilk
+komuta `-DCMAKE_C_COMPILER_LAUNCHER= -DCMAKE_CXX_COMPILER_LAUNCHER=` ekleyin.
+
+**LAN'daki herkes aynı derlemeyi kullanmalı.** İstemciler de yeni komutlara (`isNil`
+gibi) ihtiyaç duyar.
+
+### 2. Oyun verisi ve çalıştırma
+
+- **Veri:** Oyun verisi depoda yok. Steam'deki ücretsiz Demo'yu ya da tam oyunun
+  verisini kullanın. Demo verisinde editörün ve MP'nin ne kadarının açık olduğu
+  bilinmiyor; tam oyun verisi varsa onu tercih edin.
+- **Başlatma:** Oyunu veri klasörünü göstererek, log'u da bir dosyaya yazdırarak
+  başlatın:
+  ```
+  PoseidonGame.exe -C "C:\...\oyun verisi klasörü" --log-file persist_test.log
+  ```
+
+### 3. Test görevi
+
+1. **Editörde yerleştirin:**
+   - 2 oynanabilir asker: `p1` (siz) ve `p2`.
+   - Bir araç: `truck1`.
+2. **Görevi MP klasörüne koyun:** Görevi kaydedip klasörünü şuraya kopyalayın:
+
+   | Sistem | MP görev klasörü |
+   |---|---|
+   | Windows | `Belgeler\Cold War Assault\MPMissions\` |
+   | Linux | `~/.local/share/Cold War Assault/MPMissions/` |
+
+3. **Çerçeveyi ekleyin:** Görev klasörüne `mission-template/persistence/` klasörünü
+   kopyalayın. `init.sqs`, `initJIP.sqs` ve `description.ext` satırlarını da ekleyin
+   (bkz. [Kurulum](#kurulum)).
+4. **Ayarları yapın:** `persistence/config.sqf` içinde:
+   ```sqf
+   PERS_slots = ["p1", "p2"];
+   PERS_vehicles = ["truck1"];
+   ```
+
+### 4. Deneme senaryosu
+
+1. **LAN oyunu açın:** Multiplayer'dan LAN oyunu açıp görevi başlatın. Log'da
+   `Persistence: host ready, 0 saved players` satırı görünmeli.
+2. **Durumu değiştirin:** Yürüyün, bir silah bırakın, biraz hasar alın, kamyonu
+   başka yere götürün.
+3. **Kaydı bekleyin:** En az 60 saniye bekleyin. Sonra kayıt dosyasının
+   oluştuğunu kontrol edin (konumu için bkz. [Kayıt dosyası](#kayıt-dosyası)).
+   Dosya düz metindir, içinde konumunuzu görebilirsiniz.
+4. **Yeniden başlatın:** Oyunu kapatıp aynı görevi tekrar host edin. Konum,
+   teçhizat, sağlık, kamyon ve saat kaldığı yerden gelmeli.
+5. **Oyun sürerken katılma:** İkinci bir kişi oyun sürerken katılsın, oynayıp
+   çıksın, sonra tekrar katılsın. Kaldığı yerden devam etmeli.
+
+**Tek bilgisayarda deneme:** İkinci bir oyun penceresini farklı bir adla açıp kendi
+oyununuza bağlanmayı deneyebilirsiniz. Aynı makinede iki kopyanın birlikte
+çalıştığı doğrulanmadı.
+```
+PoseidonGame.exe -C "<veri klasörü>" --name Test2 --connect 127.0.0.1
+```
+
+### Sorun olursa
+
+Şu iki dosya sorunu bulmak için yeterlidir:
+- **Log dosyası:** `--log-file` ile verdiğiniz dosya. Bu seçeneği vermediyseniz
+  ve oyunu konsolsuz başlattıysanız `Belgeler\Cold War Assault\logs\cwr_*.log`.
+- **Kayıt dosyası:** `Saves\` altındaki `.txt` dosyası.
