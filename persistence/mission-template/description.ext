@@ -1,0 +1,8 @@
+// Merge these lines into your mission's description.ext.
+
+// Let players join a running game (needed for a persistent session).
+joinInProgress = 1;
+
+// Optional: respawn at base. Needs a marker named respawn_west / respawn_east / ...
+// respawn = "BASE";
+// respawnDelay = 10;

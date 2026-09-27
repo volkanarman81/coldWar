@@ -1,0 +1,14 @@
+; Host side: load the save, restore the world, answer players and autosave.
+PERS_serverReady = false
+[] call PERS_fnc_load
+[] call PERS_fnc_restoreServer
+PERS_serverReady = true
+logInfo format ["Persistence: host ready, %1 saved players", count PERS_players]
+
+_next = _time + PERS_saveInterval
+#loop
+~1
+[] call PERS_fnc_serverTick
+?_time >= _next : [] call PERS_fnc_save
+?_time >= _next : _next = _time + PERS_saveInterval
+goto "loop"

@@ -95,3 +95,13 @@ Changed files:
 - `engine/Evaluator/EvalState.cpp`: removed the standalone validator's own `str` stub,
   which the new command replaces
 - `tests/unit/engine/Evaluator/test_evaluator_str_isnil.cpp`: unit tests
+
+## 2026-09-27: persistence framework for LAN games
+
+`persistence/` holds drop-in mission scripts that keep a LAN game's state between
+sessions when a player hosts from inside the game: player gear, position and health
+(by profile name), listed vehicles, date and weather, and listed mission variables.
+The host saves with `saveString`; players are restored on their own machines through
+`remoteExec`. See `persistence/README.md` (Turkish) for setup, and
+`persistence/tests/run.sh` for tests that run the scripts in the real SQF evaluator
+with mocked game commands.

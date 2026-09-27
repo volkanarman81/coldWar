@@ -1,0 +1,19 @@
+; Player side: tell the host we are ready until it restores us, then report our
+; state regularly. Nothing is reported before the restore, so a fresh unit's
+; starting gear never overwrites the saved state.
+@!(isNull player)
+[] call PERS_fnc_findSlot
+?PERS_mySlot < 0 : hint "Persistence: this unit is not listed in PERS_slots, your progress will not be saved."
+?PERS_mySlot < 0 : exit
+
+PERS_helloCount = 0
+#hello
+[] call PERS_fnc_hello
+_retry = _time + 10
+@!(isNil "PERS_restored") || _time > _retry
+?isNil "PERS_restored" : goto "hello"
+
+#report
+~PERS_reportInterval
+?alive player : [] call PERS_fnc_report
+goto "report"

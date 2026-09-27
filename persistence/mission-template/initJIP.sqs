@@ -1,0 +1,2 @@
+; Players joining a running game. Safe even if init.sqs also runs for them.
+[] exec "persistence\init.sqs"
