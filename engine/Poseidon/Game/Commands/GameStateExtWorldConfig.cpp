@@ -104,8 +104,10 @@ static RString ConfigFullName(RString filename)
     return Poseidon::GetUserDirectory() + RString("Config/") + filename;
 }
 
-// saveString / loadString storage: <user dir>/Saves/<name>
-static const int SavedStringMaxNameLength = 64;
+// Files scripts may name, all in the player's profile directory:
+//   saveString / loadString:   <user dir>/Saves/<name>
+//   saveMission / loadMission: <user dir>/MPSaves/<name>
+static const int ProfileFileMaxNameLength = 64;
 static const int SavedStringMaxSize = 1024 * 1024;
 
 static bool IsReservedDeviceName(const char* filename)
@@ -126,12 +128,12 @@ static bool IsReservedDeviceName(const char* filename)
     return false;
 }
 
-// Map a script-supplied name to a file in the Saves folder. Only plain file names
-// made of [A-Za-z0-9_.-] are accepted, so scripts cannot reach any other path.
-static RString SavedStringFullName(RString filename)
+// Map a script-supplied name to a file in the given profile folder. Only plain file
+// names made of [A-Za-z0-9_.-] are accepted, so scripts cannot reach any other path.
+static RString ProfileFileFullName(RString filename, const char* folder)
 {
     int len = filename.GetLength();
-    if (len == 0 || len > SavedStringMaxNameLength)
+    if (len == 0 || len > ProfileFileMaxNameLength)
     {
         return RString();
     }
@@ -152,7 +154,7 @@ static RString SavedStringFullName(RString filename)
     {
         return RString();
     }
-    return Poseidon::GetUserDirectory() + RString("Saves/") + filename;
+    return Poseidon::GetUserDirectory() + RString(folder) + filename;
 }
 
 static GameFileType GetFile(GameValuePar oper)
@@ -1025,12 +1027,32 @@ GameValue ServerResume(const GameState* state)
     return NOTHING;
 }
 
+// saveMission "name" / loadMission "name": world state file in <user dir>/MPSaves/.
+// The name is restricted like saveString's, so a mission cannot overwrite or read
+// arbitrary files on the server.
+static RString MissionStateFullName(const char* command, GameValuePar oper1)
+{
+    RString name = oper1;
+    RString fullname = ProfileFileFullName(name, "MPSaves/");
+    if (fullname.GetLength() == 0)
+    {
+        const char* text = name;
+        LOG_WARN(Network, "{}: rejected file name '{}', use a plain name such as \"state.jips\"", command,
+                 text ? text : "");
+    }
+    return fullname;
+}
+
 GameValue SaveMission(const GameState* state, GameValuePar oper1)
 {
     if (GetNetworkManager().IsServer())
     {
-        GameStringType filename = oper1;
-        GetNetworkManager().SaveWorldState(filename);
+        RString fullname = MissionStateFullName("saveMission", oper1);
+        if (fullname.GetLength() > 0)
+        {
+            CreatePath(fullname);
+            GetNetworkManager().SaveWorldState(fullname);
+        }
     }
     return NOTHING;
 }
@@ -1039,8 +1061,11 @@ GameValue LoadMission(const GameState* state, GameValuePar oper1)
 {
     if (GetNetworkManager().IsServer())
     {
-        GameStringType filename = oper1;
-        GetNetworkManager().LoadWorldState(filename);
+        RString fullname = MissionStateFullName("loadMission", oper1);
+        if (fullname.GetLength() > 0)
+        {
+            GetNetworkManager().LoadWorldState(fullname);
+        }
     }
     return NOTHING;
 }
@@ -1181,7 +1206,7 @@ GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar op
     {
         return false;
     }
-    RString fullname = SavedStringFullName(oper1);
+    RString fullname = ProfileFileFullName(oper1, "Saves/");
     if (fullname.GetLength() == 0)
     {
         return false;
@@ -1222,7 +1247,7 @@ GameValue StringLoadSaved(const GameState* state, GameValuePar oper1)
     {
         return RString();
     }
-    RString fullname = SavedStringFullName(oper1);
+    RString fullname = ProfileFileFullName(oper1, "Saves/");
     if (fullname.GetLength() == 0 || !QIFStream::FileExists(fullname))
     {
         return RString();

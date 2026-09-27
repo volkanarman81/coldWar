@@ -42,7 +42,7 @@ Rules:
 Changed files:
 
 - `engine/Poseidon/Game/Commands/GameStateExtWorldConfig.cpp`: implementation
-  (`SavedStringFullName`, `StringSave`, `StringLoadSaved`)
+  (`ProfileFileFullName`, `StringSave`, `StringLoadSaved`)
 - `engine/Poseidon/Game/Commands/GameStateExt.cpp`: command registration
 - `engine/Evaluator/Validate.cpp`: the standalone validator skips these commands
 - `tests/unit/engine/Poseidon/Game/test_game_state_ext.cpp`: unit tests
@@ -105,3 +105,17 @@ The host saves with `saveString`; players are restored on their own machines thr
 `remoteExec`. See `persistence/README.md` (Turkish) for setup, and
 `persistence/tests/run.sh` for tests that run the scripts in the real SQF evaluator
 with mocked game commands.
+
+## 2026-09-27: `saveMission` / `loadMission` restricted to a profile folder
+
+These server-only commands passed the script's string straight to `fopen`, so a
+mission running on a server could truncate or read any file the game process can
+access (`saveMission "/home/user/.bashrc"`). They now take a plain file name with the
+same rules as `saveString` and use `<user dir>/MPSaves/<name>`, e.g.
+`saveMission "state.jips"`. Any other name is refused with a warning in the log.
+Missions that passed a path must now pass just a file name.
+
+Changed files:
+
+- `engine/Poseidon/Game/Commands/GameStateExtWorldConfig.cpp`: `SaveMission`,
+  `LoadMission`; the name check shared with `saveString` is now `ProfileFileFullName`
