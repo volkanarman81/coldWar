@@ -33,6 +33,9 @@ Rules:
   rejected. Any path separator, drive letter or other character is rejected.
 - Text is limited to 1 MiB per file, and a file larger than that loads as `""`.
 - Every mission uses the same `Saves/` folder, so pick distinctive names.
+- In multiplayer only the server keeps saves: the dedicated server or the player
+  hosting the game. On a client connected to someone else's game, `saveString`
+  returns `false` and `loadString` returns `""`. Single player is not affected.
 
 Changed files:
 
@@ -41,3 +44,26 @@ Changed files:
 - `engine/Poseidon/Game/Commands/GameStateExt.cpp`: command registration
 - `engine/Evaluator/Validate.cpp`: the standalone validator skips these commands
 - `tests/unit/engine/Poseidon/Game/test_game_state_ext.cpp`: unit tests
+
+## 2026-09-27: `date`, `overcast`, `fog`, `rain` getters
+
+The engine had `setDate`, `setOvercast`, `setFog` and `setRain` but no way to read
+the current values back, so world state could not be saved. New commands:
+
+| Command | Returns |
+|---------|---------|
+| `date` | `[year, month, day, hour, minute]`, the same layout `setDate` takes |
+| `overcast` | current overcast, 0..1 |
+| `fog` | current fog, 0..1 |
+| `rain` | current rain density, 0..1 |
+
+A mission variable with one of these names still takes precedence over the command,
+so older missions that use them as variable names keep working.
+
+Changed files:
+
+- `engine/Poseidon/Game/Commands/GameStateExtWorldConfig.cpp`: `GetDate`, `GetOvercast`,
+  `GetFog`, `GetRain`
+- `engine/Poseidon/Game/Commands/GameStateExt.cpp`: command registration
+- `engine/Poseidon/World/World.hpp`: `GetActualOvercast()` / `GetActualFog()` accessors
+- `tests/unit/engine/Poseidon/Game/test_game_state_ext.cpp`: registration checks

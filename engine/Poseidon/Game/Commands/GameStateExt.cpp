@@ -395,6 +395,10 @@ GameValue CameraOn(const GameState* state);
 GameValue ConfigListNames(const GameState* state);
 GameValue ConfigNew(const GameState* state);
 GameValue DayTime(const GameState* state);
+GameValue GetDate(const GameState* state);
+GameValue GetFog(const GameState* state);
+GameValue GetOvercast(const GameState* state);
+GameValue GetRain(const GameState* state);
 GameValue EnableEndDialog(const GameState* state);
 GameValue EndGame(const GameState* state);
 GameValue ForceEnd(const GameState* state);
@@ -860,6 +864,10 @@ static const GameNular* GetExtNular(int& count)
         GameNular(GameGroup, "grpNull", GrpNull),
         GameNular(GameScalar, "time", GameTime),
         GameNular(GameScalar, "dayTime", DayTime),
+        GameNular(GameArray, "date", GetDate),
+        GameNular(GameScalar, "overcast", GetOvercast),
+        GameNular(GameScalar, "fog", GetFog),
+        GameNular(GameScalar, "rain", GetRain),
         GameNular(GameBool, "cadetMode", CadetMode),
         GameNular(GameScalar, "benchmark", Benchmark),
         GameNular(GameScalar, "accTime", GetAcceleratedTime),

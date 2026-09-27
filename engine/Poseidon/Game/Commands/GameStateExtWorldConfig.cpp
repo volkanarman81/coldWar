@@ -79,6 +79,7 @@ void CreatePath(RString);
 void AddDeadIdentity(RString);
 RString FindScript(RString name);
 RString GetUserDirectory();
+int GetDaysInMonth(int year, int month);
 } // namespace Poseidon
 
 static RString ConfigFullName(RString filename)
@@ -688,6 +689,59 @@ GameValue SetDate(const GameState* state, GameValuePar oper1)
     return NOTHING;
 }
 
+// date: [year, month, day, hour, minute], the same layout setDate takes
+GameValue GetDate(const GameState* state)
+{
+    int year = Glob.clock.GetYear();
+    int day = int(floor(Glob.clock.GetTimeInYear() * 365));
+    if (day < 0)
+    {
+        day = 0;
+    }
+    int month = 0;
+    while (month < 11 && day >= Poseidon::GetDaysInMonth(year, month))
+    {
+        day -= Poseidon::GetDaysInMonth(year, month);
+        month++;
+    }
+    int minutes = int(floor(Glob.clock.GetTimeOfDay() * 24 * 60));
+    if (minutes < 0)
+    {
+        minutes = 0;
+    }
+    else if (minutes > 24 * 60 - 1)
+    {
+        minutes = 24 * 60 - 1;
+    }
+
+    GameValue value = state->CreateGameValue(GameArray);
+    GameArrayType& array = value;
+    array.Resize(5);
+    array[0] = float(year);
+    array[1] = float(month + 1);
+    array[2] = float(day + 1);
+    array[3] = float(minutes / 60);
+    array[4] = float(minutes % 60);
+    return value;
+}
+
+// overcast / fog: current values, 0..1 (what setOvercast / setFog move towards)
+GameValue GetOvercast(const GameState* state)
+{
+    return GWorld->GetActualOvercast();
+}
+
+GameValue GetFog(const GameState* state)
+{
+    return GWorld->GetActualFog();
+}
+
+// rain: current rain density, 0..1
+GameValue GetRain(const GameState* state)
+{
+    return GLandscape->GetRainDensity();
+}
+
 GameValue CenterCreate(const GameState* state, GameValuePar oper1)
 {
     GameSideType side = GetSide(oper1);
@@ -1108,10 +1162,22 @@ GameValue StringLoad(const GameState* state, GameValuePar oper1)
     return RString();
 }
 
+// In multiplayer only the server (dedicated or the hosting player) keeps saves, so a
+// client never writes to its own disk on behalf of a mission. Single player is allowed.
+static bool SavedStringsAllowed()
+{
+    const INetworkManager& network = GetNetworkManager();
+    return network.IsServer() || network.GetGameState() == NGSNone;
+}
+
 // "name" saveString "text": write text to <user dir>/Saves/name, replacing any old content.
-// Returns false on an invalid name, oversized text or a write error.
+// Returns false on a multiplayer client, an invalid name, oversized text or a write error.
 GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar oper2)
 {
+    if (!SavedStringsAllowed())
+    {
+        return false;
+    }
     RString fullname = SavedStringFullName(oper1);
     if (fullname.GetLength() == 0)
     {
@@ -1135,9 +1201,14 @@ GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar op
     return !out.fail();
 }
 
-// loadString "name": content of <user dir>/Saves/name, or "" if it does not exist.
+// loadString "name": content of <user dir>/Saves/name, or "" if it does not exist
+// (always "" on a multiplayer client).
 GameValue StringLoadSaved(const GameState* state, GameValuePar oper1)
 {
+    if (!SavedStringsAllowed())
+    {
+        return RString();
+    }
     RString fullname = SavedStringFullName(oper1);
     if (fullname.GetLength() == 0 || !QIFStream::FileExists(fullname))
     {

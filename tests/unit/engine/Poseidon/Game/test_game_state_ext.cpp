@@ -356,6 +356,10 @@ TEST_CASE("VBS-derived functions remain registered in GGameState", "[game][gameS
     REQUIRE(ContainsName(operators, "saveConfig"));
     REQUIRE(ContainsName(operators, "saveString"));
     REQUIRE(ContainsName(functions, "loadString"));
+    REQUIRE(ContainsName(nulars, "date"));
+    REQUIRE(ContainsName(nulars, "overcast"));
+    REQUIRE(ContainsName(nulars, "fog"));
+    REQUIRE(ContainsName(nulars, "rain"));
     REQUIRE(ContainsName(operators, "openClass"));
     REQUIRE(ContainsName(operators, "addClass"));
     REQUIRE(ContainsName(operators, "getValue"));
