@@ -626,6 +626,7 @@ GameValue StrLocalize(const GameState* state, GameValuePar oper1);
 GameValue StrSize(const GameState* state, GameValuePar oper1);
 GameValue StrSub(const GameState* state, GameValuePar oper1);
 GameValue StringLoad(const GameState* state, GameValuePar oper1);
+GameValue StringLoadSaved(const GameState* state, GameValuePar oper1);
 GameValue StringPreprocess(const GameState* state, GameValuePar oper1);
 GameValue LogInfo(const GameState* state, GameValuePar oper1);
 GameValue TextDebugLog(const GameState* state, GameValuePar oper1);
@@ -662,6 +663,7 @@ GameValue CenterSetFriend(const GameState* state, GameValuePar oper1, GameValueP
 GameValue ClassAdd(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue ClassOpen(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue ConfigSave(const GameState* state, GameValuePar oper1, GameValuePar oper2);
+GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue EffectSetCamera(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue EffectSetCondition(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue EffectSetMusic(const GameState* state, GameValuePar oper1, GameValuePar oper2);
@@ -1157,6 +1159,7 @@ static const GameFunction* GetExtUnary(int& count)
         GameFunction(GameArray, "VBS_injuries", GetMPReportInjuries, GameString),
 
         GameFunction(GameString, "loadFile", StringLoad, GameString),
+        GameFunction(GameString, "loadString", StringLoadSaved, GameString),
         GameFunction(GameString, "preprocessFile", StringPreprocess, GameString),
 
         GameFunction(GameScalar, "playersNumber", PlayersNumber, GameSide),
@@ -1385,6 +1388,7 @@ static const GameOperator* GetExtBinary(int& count)
         GameOperator(GameNothing, "setObjectTexture", function, ObjSetTexture, GameObject, GameArray),
 
         GameOperator(GameNothing, "saveConfig", function, ConfigSave, GameFile, GameString),
+        GameOperator(GameBool, "saveString", function, StringSave, GameString, GameString),
         GameOperator(GameFile, "openClass", function, ClassOpen, GameFile, GameString),
         GameOperator(GameFile, "addClass", function, ClassAdd, GameFile, GameString),
         GameOperator(GameVoid, "getValue", function, ValueGet, GameFile, GameString),

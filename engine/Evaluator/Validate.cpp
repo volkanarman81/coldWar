@@ -155,7 +155,8 @@ static bool needsGameObjects(const std::string& code)
                                     "removeWeapon",     "removeMagazine",
                                     "setObjectTexture", "setObjectMaterial",
                                     "forceAddUniform",  "addVest",
-                                    "addBackpack",      nullptr};
+                                    "addBackpack",      "saveString",
+                                    "loadString",       nullptr};
     for (int i = 0; markers[i]; i++)
         if (code.find(markers[i]) != std::string::npos)
             return true;

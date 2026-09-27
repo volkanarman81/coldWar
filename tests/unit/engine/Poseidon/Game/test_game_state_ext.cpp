@@ -57,6 +57,8 @@ GameValue ClassOpen(const GameState* state, GameValuePar oper1, GameValuePar ope
 GameValue ClassAdd(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue ValueGet(const GameState* state, GameValuePar oper1, GameValuePar oper2);
 GameValue ValueAdd(const GameState* state, GameValuePar oper1, GameValuePar oper2);
+GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar oper2);
+GameValue StringLoadSaved(const GameState* state, GameValuePar oper1);
 extern bool GUseFileBanks;
 
 namespace
@@ -232,6 +234,18 @@ std::filesystem::path ConfigStoragePath(const char* filename)
     return std::filesystem::path(static_cast<const char*>(GetUserDirectory())) / "Config" / filename;
 }
 
+std::filesystem::path SavesStoragePath(const char* filename)
+{
+    return std::filesystem::path(static_cast<const char*>(GetUserDirectory())) / "Saves" / filename;
+}
+
+std::string AsStdString(GameValuePar value)
+{
+    RString text = value;
+    const char* data = text;
+    return std::string(data ? data : "");
+}
+
 GameValue MakeConfigAssignment(const GameState& state, const char* name, GameValue value)
 {
     GameValue pair = state.CreateGameValue(GameArray);
@@ -340,6 +354,8 @@ TEST_CASE("VBS-derived functions remain registered in GGameState", "[game][gameS
     REQUIRE(ContainsName(functions, "createGuardedPoint"));
     REQUIRE(ContainsName(functions, "deleteWaypoint"));
     REQUIRE(ContainsName(operators, "saveConfig"));
+    REQUIRE(ContainsName(operators, "saveString"));
+    REQUIRE(ContainsName(functions, "loadString"));
     REQUIRE(ContainsName(operators, "openClass"));
     REQUIRE(ContainsName(operators, "addClass"));
     REQUIRE(ContainsName(operators, "getValue"));
@@ -657,6 +673,76 @@ TEST_CASE("FILE config commands can create mutate save and reload config trees",
     REQUIRE((float)missing == 7.0f);
 
     std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("saveString and loadString round-trip text in the Saves folder", "[game][gameStateExt][saves]")
+{
+    GGameState.Reset();
+    Poseidon::Foundation::InitModules();
+
+    const char* filename = "unit_test_save_string.txt";
+    const auto path = SavesStoragePath(filename);
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+
+    // missing file loads as empty string
+    GameValue missing = StringLoadSaved(&GGameState, RString(filename));
+    REQUIRE(missing.GetType() == GameString);
+    REQUIRE(AsStdString(missing).empty());
+
+    const char* text = "[1,\"two\",[3]]\nsecond line";
+    GameValue saved = StringSave(&GGameState, RString(filename), RString(text));
+    REQUIRE(saved.GetType() == GameBool);
+    REQUIRE((bool)saved);
+    REQUIRE(std::filesystem::exists(path));
+    REQUIRE(AsStdString(StringLoadSaved(&GGameState, RString(filename))) == text);
+
+    // saving again replaces the old content
+    REQUIRE((bool)StringSave(&GGameState, RString(filename), RString("short")));
+    REQUIRE(AsStdString(StringLoadSaved(&GGameState, RString(filename))) == "short");
+
+    // empty text is a valid save
+    REQUIRE((bool)StringSave(&GGameState, RString(filename), RString("")));
+    REQUIRE(std::filesystem::exists(path));
+    REQUIRE(AsStdString(StringLoadSaved(&GGameState, RString(filename))).empty());
+
+    std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("saveString and loadString reject names outside the Saves folder", "[game][gameStateExt][saves]")
+{
+    GGameState.Reset();
+    Poseidon::Foundation::InitModules();
+
+    const char* badNames[] = {"",
+                              ".",
+                              "..",
+                              ".hidden",
+                              "../escape.txt",
+                              "..\\escape.txt",
+                              "sub/file.txt",
+                              "C:file.txt",
+                              "/etc/passwd",
+                              "name with space",
+                              "con",
+                              "NUL.txt",
+                              "com1.sav",
+                              "a_name_that_is_far_too_long_to_be_accepted_as_a_save_file_name_xyz"};
+    for (const char* name : badNames)
+    {
+        INFO("name: " << name);
+        GameValue saved = StringSave(&GGameState, RString(name), RString("data"));
+        REQUIRE(saved.GetType() == GameBool);
+        REQUIRE_FALSE((bool)saved);
+        REQUIRE(AsStdString(StringLoadSaved(&GGameState, RString(name))).empty());
+    }
+
+    // names that look like devices but are not exact matches are fine
+    const char* okName = "console-1.txt";
+    REQUIRE((bool)StringSave(&GGameState, RString(okName), RString("ok")));
+    REQUIRE(AsStdString(StringLoadSaved(&GGameState, RString(okName))) == "ok");
+    std::error_code ec;
+    std::filesystem::remove(SavesStoragePath(okName), ec);
 }
 
 TEST_CASE("Advanced product PBO exposes metadata and config payload", "[game][gameStateExt][pbo][addons]")

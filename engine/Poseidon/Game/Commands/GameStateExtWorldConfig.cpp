@@ -100,6 +100,57 @@ static RString ConfigFullName(RString filename)
     return Poseidon::GetUserDirectory() + RString("Config/") + filename;
 }
 
+// saveString / loadString storage: <user dir>/Saves/<name>
+static const int SavedStringMaxNameLength = 64;
+static const int SavedStringMaxSize = 1024 * 1024;
+
+static bool IsReservedDeviceName(const char* filename)
+{
+    // Windows opens a device instead of a file for these, whatever the extension
+    static const char* reserved[] = {"con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4",
+                                     "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3",
+                                     "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"};
+    const char* ext = strchr(filename, '.');
+    int baseLen = ext ? int(ext - filename) : int(strlen(filename));
+    for (const char* name : reserved)
+    {
+        if (int(strlen(name)) == baseLen && strnicmp(filename, name, baseLen) == 0)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Map a script-supplied name to a file in the Saves folder. Only plain file names
+// made of [A-Za-z0-9_.-] are accepted, so scripts cannot reach any other path.
+static RString SavedStringFullName(RString filename)
+{
+    int len = filename.GetLength();
+    if (len == 0 || len > SavedStringMaxNameLength)
+    {
+        return RString();
+    }
+    // no hidden files, no "." / ".."
+    if (filename[0] == '.')
+    {
+        return RString();
+    }
+    for (int i = 0; i < len; i++)
+    {
+        unsigned char c = static_cast<unsigned char>(filename[i]);
+        if (!isalnum(c) && c != '_' && c != '-' && c != '.')
+        {
+            return RString();
+        }
+    }
+    if (IsReservedDeviceName(filename))
+    {
+        return RString();
+    }
+    return Poseidon::GetUserDirectory() + RString("Saves/") + filename;
+}
+
 static GameFileType GetFile(GameValuePar oper)
 {
     PoseidonAssert(oper.GetType() == GameFile);
@@ -1055,6 +1106,50 @@ GameValue StringLoad(const GameState* state, GameValuePar oper1)
         return RString(in.act(), in.rest());
     }
     return RString();
+}
+
+// "name" saveString "text": write text to <user dir>/Saves/name, replacing any old content.
+// Returns false on an invalid name, oversized text or a write error.
+GameValue StringSave(const GameState* state, GameValuePar oper1, GameValuePar oper2)
+{
+    RString fullname = SavedStringFullName(oper1);
+    if (fullname.GetLength() == 0)
+    {
+        return false;
+    }
+    RString text = oper2;
+    int size = text.GetLength();
+    if (size > SavedStringMaxSize)
+    {
+        return false;
+    }
+
+    CreatePath(fullname);
+    QOFStream out;
+    out.open(fullname);
+    if (size > 0)
+    {
+        out.write(text, size);
+    }
+    out.close();
+    return !out.fail();
+}
+
+// loadString "name": content of <user dir>/Saves/name, or "" if it does not exist.
+GameValue StringLoadSaved(const GameState* state, GameValuePar oper1)
+{
+    RString fullname = SavedStringFullName(oper1);
+    if (fullname.GetLength() == 0 || !QIFStream::FileExists(fullname))
+    {
+        return RString();
+    }
+    QIFStream in;
+    in.open(fullname);
+    if (in.fail() || in.rest() > SavedStringMaxSize)
+    {
+        return RString();
+    }
+    return RString(in.act(), in.rest());
 }
 
 class FilePreprocessor : public Preproc
